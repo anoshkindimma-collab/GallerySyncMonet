@@ -23,7 +23,7 @@ jobs:
           gradle-version: '8.7'
       - name: Build APK
         run: |
-          unzip -o InterstellarGallery_Monet_Sync_Project.zip -d work_apk
+          unzip -o band11_picsync_apk.zip -d work_apk
           cd work_apk
           gradle assembleRelease
           mkdir -p ../release_apks

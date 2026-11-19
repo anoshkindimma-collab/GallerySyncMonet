@@ -15,16 +15,30 @@ jobs:
       - name: Unpack project zip if needed
         run: |
           if [ ! -f settings.gradle.kts ] && [ ! -f settings.gradle ]; then
-            ZIP_FILE=$(ls -1 *apk*.zip 2>/dev/null | head -n 1)
+            ZIP_FILE=$(ls -1 *apk*.zip 2>/dev/null | grep -v -i "ebook" | head -n 1)
             if [ -z "$ZIP_FILE" ]; then
-              ZIP_FILE=$(ls -1 *.zip 2>/dev/null | head -n 1)
+              ZIP_FILE=$(ls -1 *.zip 2>/dev/null | grep -v -i "ebook" | head -n 1)
             fi
             if [ -z "$ZIP_FILE" ]; then
-              echo "Не найден settings.gradle.kts или zip с проектом в корне репо!"
+              echo "Не найден zip с проектом APK в корне репо!"
               exit 1
             fi
             echo "Распаковка $ZIP_FILE..."
             unzip -o "$ZIP_FILE" -d .
+          fi
+
+      - name: Extract XMS Wearable SDK from eBook APK if present
+        run: |
+          EBOOK_FILE=$(ls -1 *eBook* 2>/dev/null | head -n 1)
+          if [ -n "$EBOOK_FILE" ]; then
+            echo "Найден $EBOOK_FILE — извлекаем classes11.dex в app/libs/xms-wearable.jar..."
+            mkdir -p tmp_ebook app/libs
+            unzip -o "$EBOOK_FILE" "classes11.dex" -d tmp_ebook || true
+            if [ -f tmp_ebook/classes11.dex ]; then
+              sudo apt-get update -qq && sudo apt-get install -y -qq dex2jar
+              d2j-dex2jar tmp_ebook/classes11.dex -o app/libs/xms-wearable.jar --force
+              ls -lh app/libs/xms-wearable.jar
+            fi
           fi
 
       - name: Setup JDK 17
@@ -33,20 +47,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle & Wrapper if missing
+      - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
-      - name: Ensure gradlew and wrapper jar exist
-        run: |
-          if [ ! -f ./gradlew ]; then
-            gradle wrapper --gradle-version 8.7
-          fi
-          chmod +x ./gradlew
-
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace
 
       - name: Find built APKs
         run: find app/build/outputs/apk -type f -name "*.apk"
@@ -56,4 +63,4 @@ jobs:
         with:
           name: band11-picsync-apk
           path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          if-no-files-found: error       
